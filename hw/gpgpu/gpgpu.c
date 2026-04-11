@@ -25,20 +25,26 @@
 /* TODO: Implement MMIO control register read */
 static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
 {
-    (void)opaque;
-    (void)addr;
-    (void)size;
-    return 0;
+    // GPGUPUState *gpu = opaque;
+    uint64_t val = ~0ULL;
+
+    switch (addr) {
+    case GPGPU_REG_DEV_ID:
+        val = GPGPU_DEV_ID_VALUE;
+        break;
+    case GPGPU_REG_DEV_VERSION:
+        val = GPGPU_DEV_VERSION_VALUE;
+        break;
+    }
+
+    return val;
 }
 
 /* TODO: Implement MMIO control register write */
 static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
                              unsigned size)
 {
-    (void)opaque;
-    (void)addr;
-    (void)val;
-    (void)size;
+    // GPGPUState *gpu = opaque;
 }
 
 static const MemoryRegionOps gpgpu_ctrl_ops = {
