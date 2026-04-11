@@ -47,6 +47,24 @@ static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
         case GPGPU_REG_GLOBAL_STATUS:
             val = gpu->global_status;
             break;
+        case GPGPU_REG_GRID_DIM_X:
+            val = gpu->kernel.grid_dim[0];
+            break;
+        case GPGPU_REG_GRID_DIM_Y:
+            val = gpu->kernel.grid_dim[1];
+            break;
+        case GPGPU_REG_GRID_DIM_Z:
+            val = gpu->kernel.grid_dim[2];
+            break;
+        case GPGPU_REG_BLOCK_DIM_X:
+            val = gpu->kernel.block_dim[0];
+            break;
+        case GPGPU_REG_BLOCK_DIM_Y:
+            val = gpu->kernel.block_dim[1];
+            break;
+        case GPGPU_REG_BLOCK_DIM_Z:
+            val = gpu->kernel.block_dim[2];
+            break;
     }
 
     return val;
@@ -61,6 +79,25 @@ static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
     switch (addr) {
         case GPGPU_REG_GLOBAL_CTRL:
             gpu->global_ctrl = val;
+            break;
+        case GPGPU_REG_GRID_DIM_X:
+            gpu->kernel.grid_dim[0] = val;
+            break;
+        case GPGPU_REG_GRID_DIM_Y:
+            gpu->kernel.grid_dim[1] = val;
+            break;
+        case GPGPU_REG_GRID_DIM_Z:
+            gpu->kernel.grid_dim[2] = val;
+            break;
+        case GPGPU_REG_BLOCK_DIM_X:
+            gpu->kernel.block_dim[0] = val;
+            break;
+        case GPGPU_REG_BLOCK_DIM_Y:
+            gpu->kernel.block_dim[1] = val;
+            break;
+        case GPGPU_REG_BLOCK_DIM_Z:
+            gpu->kernel.block_dim[2] = val;
+            break;
     }
 }
 
