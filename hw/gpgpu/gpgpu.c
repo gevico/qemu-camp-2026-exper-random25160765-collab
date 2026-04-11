@@ -47,6 +47,15 @@ static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
         case GPGPU_REG_GLOBAL_STATUS:
             val = gpu->global_status;
             break;
+        case GPGPU_REG_ERROR_STATUS:
+            val = gpu->error_status;
+            break;
+        case GPGPU_REG_IRQ_ENABLE:
+            val = gpu->irq_enable;
+            break;
+        case GPGPU_REG_IRQ_STATUS:
+            val = gpu->irq_status;
+            break;
         case GPGPU_REG_GRID_DIM_X:
             val = gpu->kernel.grid_dim[0];
             break;
@@ -65,6 +74,27 @@ static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
         case GPGPU_REG_BLOCK_DIM_Z:
             val = gpu->kernel.block_dim[2];
             break;
+        case GPGPU_REG_DMA_SRC_LO:
+            val = (gpu->dma.src_addr << 32) >> 32;
+            break;
+        case GPGPU_REG_DMA_SRC_HI:
+            val = gpu->dma.src_addr >> 32;
+            break;
+        case GPGPU_REG_DMA_DST_LO:
+            val = (gpu->dma.dst_addr << 32) >> 32;
+            break;
+        case GPGPU_REG_DMA_DST_HI:
+            val = gpu->dma.dst_addr >> 32;
+            break;
+        case GPGPU_REG_DMA_SIZE:
+            val = gpu->dma.size;
+            break;
+        case GPGPU_REG_DMA_CTRL:
+            val = gpu->dma.ctrl;
+            break;
+        case GPGPU_REG_DMA_STATUS:
+            val = gpu->dma.status;
+            break;
     }
 
     return val;
@@ -79,6 +109,18 @@ static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
     switch (addr) {
         case GPGPU_REG_GLOBAL_CTRL:
             gpu->global_ctrl = val;
+            break;
+        case GPGPU_REG_GLOBAL_STATUS:
+            gpu->global_status = val;
+            break;
+        case GPGPU_REG_ERROR_STATUS:
+            gpu->error_status = val;
+            break;
+        case GPGPU_REG_IRQ_ENABLE:
+            gpu->irq_enable = val;
+            break;
+        case GPGPU_REG_IRQ_STATUS:
+            gpu->irq_status = val;
             break;
         case GPGPU_REG_GRID_DIM_X:
             gpu->kernel.grid_dim[0] = val;
@@ -97,6 +139,27 @@ static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
             break;
         case GPGPU_REG_BLOCK_DIM_Z:
             gpu->kernel.block_dim[2] = val;
+            break;
+        case GPGPU_REG_DMA_SRC_LO:
+            gpu->dma.src_addr = (val << 32) >> 32;
+            break;
+        case GPGPU_REG_DMA_SRC_HI:
+            gpu->dma.src_addr = val << 32;
+            break;
+        case GPGPU_REG_DMA_DST_LO:
+            gpu->dma.dst_addr = (val << 32) >> 32;
+            break;
+        case GPGPU_REG_DMA_DST_HI:
+            gpu->dma.dst_addr = val << 32;
+            break;
+        case GPGPU_REG_DMA_SIZE:
+            gpu->dma.size = val;
+            break;
+        case GPGPU_REG_DMA_CTRL:
+            gpu->dma.ctrl = val;
+            break;
+        case GPGPU_REG_DMA_STATUS:
+            gpu->dma.status = val;
             break;
     }
 }
