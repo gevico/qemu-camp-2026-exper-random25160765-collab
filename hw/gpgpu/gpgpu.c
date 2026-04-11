@@ -95,6 +95,32 @@ static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
         case GPGPU_REG_DMA_STATUS:
             val = gpu->dma.status;
             break;
+        case GPGPU_REG_THREAD_ID_X:
+            val = gpu->simt.thread_id[0];
+            break;
+        case GPGPU_REG_THREAD_ID_Y:
+            val = gpu->simt.thread_id[1];
+            break;
+        case GPGPU_REG_THREAD_ID_Z:
+            val = gpu->simt.thread_id[2];
+            break;
+        case GPGPU_REG_BLOCK_ID_X:
+            val = gpu->simt.block_id[0];
+            break;
+        case GPGPU_REG_BLOCK_ID_Y:
+            val = gpu->simt.block_id[1];
+            break;
+        case GPGPU_REG_BLOCK_ID_Z:
+            val = gpu->simt.block_id[2];
+            break;
+        case GPGPU_REG_WARP_ID:
+            val = gpu->simt.warp_id;
+            break;
+        case GPGPU_REG_LANE_ID:
+            val = gpu->simt.lane_id;
+            break;
+        case GPGPU_REG_THREAD_MASK:
+            val = gpu->simt.thread_mask;
     }
 
     return val;
@@ -109,6 +135,9 @@ static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
     switch (addr) {
         case GPGPU_REG_GLOBAL_CTRL:
             gpu->global_ctrl = val;
+            if (val == GPGPU_CTRL_RESET) {
+                memset(&gpu->simt, 0, sizeof(gpu->simt));
+            }
             break;
         case GPGPU_REG_GLOBAL_STATUS:
             gpu->global_status = val;
@@ -161,6 +190,32 @@ static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
         case GPGPU_REG_DMA_STATUS:
             gpu->dma.status = val;
             break;
+        case GPGPU_REG_THREAD_ID_X:
+            gpu->simt.thread_id[0] = val;
+            break;
+        case GPGPU_REG_THREAD_ID_Y:
+            gpu->simt.thread_id[1] = val;
+            break;
+        case GPGPU_REG_THREAD_ID_Z:
+            gpu->simt.thread_id[2] = val;
+            break;
+        case GPGPU_REG_BLOCK_ID_X:
+            gpu->simt.block_id[0] = val;
+            break;
+        case GPGPU_REG_BLOCK_ID_Y:
+            gpu->simt.block_id[1] = val;
+            break;
+        case GPGPU_REG_BLOCK_ID_Z:
+            gpu->simt.block_id[2] = val;
+            break;
+        case GPGPU_REG_WARP_ID:
+            gpu->simt.warp_id = val;
+            break;
+        case GPGPU_REG_LANE_ID:
+            gpu->simt.lane_id = val;
+            break;
+        case GPGPU_REG_THREAD_MASK:
+            gpu->simt.thread_mask = val;
     }
 }
 
