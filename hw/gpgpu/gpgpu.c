@@ -25,22 +25,28 @@
 /* TODO: Implement MMIO control register read */
 static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
 {
-    // GPGUPUState *gpu = opaque;
+    GPGPUState *gpu = opaque;
     uint64_t val = ~0ULL;
 
     switch (addr) {
-    case GPGPU_REG_DEV_ID:
-        val = GPGPU_DEV_ID_VALUE;
-        break;
-    case GPGPU_REG_DEV_VERSION:
-        val = GPGPU_DEV_VERSION_VALUE;
-        break;
-    case GPGPU_REG_VRAM_SIZE_LO:
-        val = 0x04000000;
-        break;
-    case GPGPU_REG_VRAM_SIZE_HI:
-        val = 0x00000000;
-        break;
+        case GPGPU_REG_DEV_ID:
+            val = GPGPU_DEV_ID_VALUE;
+            break;
+        case GPGPU_REG_DEV_VERSION:
+            val = GPGPU_DEV_VERSION_VALUE;
+            break;
+        case GPGPU_REG_VRAM_SIZE_LO:
+            val = 0x04000000;
+            break;
+        case GPGPU_REG_VRAM_SIZE_HI:
+            val = 0x00000000;
+            break;
+        case GPGPU_REG_GLOBAL_CTRL:
+            val = gpu->global_ctrl;
+            break;
+        case GPGPU_REG_GLOBAL_STATUS:
+            val = gpu->global_status;
+            break;
     }
 
     return val;
@@ -50,7 +56,12 @@ static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
 static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
                              unsigned size)
 {
-    // GPGPUState *gpu = opaque;
+    GPGPUState *gpu = opaque;
+
+    switch (addr) {
+        case GPGPU_REG_GLOBAL_CTRL:
+            gpu->global_ctrl = val;
+    }
 }
 
 static const MemoryRegionOps gpgpu_ctrl_ops = {
