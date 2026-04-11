@@ -114,20 +114,51 @@ static const MemoryRegionOps gpgpu_ctrl_ops = {
 /* TODO: Implement VRAM read */
 static uint64_t gpgpu_vram_read(void *opaque, hwaddr addr, unsigned size)
 {
-    (void)opaque;
-    (void)addr;
-    (void)size;
-    return 0;
+    GPGPUState *gpu = opaque;
+    uint64_t val = ~0ULL;
+
+    if(addr + size <= gpu->vram_size) {
+        switch (size) {
+            case 1:
+                val = *(uint8_t*)(gpu->vram_ptr + addr);
+                break;
+            case 2:
+                val = *(uint16_t*)(gpu->vram_ptr + addr);
+                break;
+            case 4:
+                val = *(uint32_t*)(gpu->vram_ptr + addr);
+                break;
+            case 8:
+                val = *(uint64_t*)(gpu->vram_ptr + addr);
+                break;
+        }
+    }
+
+    return val;
 }
 
 /* TODO: Implement VRAM write */
 static void gpgpu_vram_write(void *opaque, hwaddr addr, uint64_t val,
                              unsigned size)
 {
-    (void)opaque;
-    (void)addr;
-    (void)val;
-    (void)size;
+    GPGPUState *gpu = opaque;
+
+    if(addr + size <= gpu->vram_size) {
+        switch (size) {
+            case 1:
+                *(uint8_t*)(gpu->vram_ptr + addr) = val;
+                break;
+            case 2:
+                *(uint16_t*)(gpu->vram_ptr + addr) = val;
+                break;
+            case 4:
+                *(uint32_t*)(gpu->vram_ptr + addr) = val;
+                break;
+            case 8:
+                *(uint64_t*)(gpu->vram_ptr + addr) = val;
+                break;
+        }
+    }
 }
 
 static const MemoryRegionOps gpgpu_vram_ops = {
