@@ -35,6 +35,12 @@ static uint64_t gpgpu_ctrl_read(void *opaque, hwaddr addr, unsigned size)
     case GPGPU_REG_DEV_VERSION:
         val = GPGPU_DEV_VERSION_VALUE;
         break;
+    case GPGPU_REG_VRAM_SIZE_LO:
+        val = 0x04000000;
+        break;
+    case GPGPU_REG_VRAM_SIZE_HI:
+        val = 0x00000000;
+        break;
     }
 
     return val;
