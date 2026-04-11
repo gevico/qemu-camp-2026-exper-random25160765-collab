@@ -169,17 +169,29 @@ static void gpgpu_ctrl_write(void *opaque, hwaddr addr, uint64_t val,
         case GPGPU_REG_BLOCK_DIM_Z:
             gpu->kernel.block_dim[2] = val;
             break;
+        case GPGPU_REG_DISPATCH:
+            gpu->global_status = GPGPU_STATUS_BUSY;
+            int ret = gpgpu_core_exec_kernel(gpu);
+            if (ret == 0) {
+                gpu->global_status = GPGPU_STATUS_READY;
+                gpu->irq_status |= GPGPU_IRQ_KERNEL_DONE;
+            } else {
+                gpu->global_status = GPGPU_STATUS_ERROR;
+                gpu->error_status |= GPGPU_ERR_KERNEL_FAULT;
+                gpu->irq_status |= GPGPU_IRQ_ERROR;
+            }
+            break;
         case GPGPU_REG_DMA_SRC_LO:
-            gpu->dma.src_addr = (val << 32) >> 32;
+            gpu->dma.src_addr = (gpu->dma.src_addr & 0xFFFFFFFF00000000ULL) | val;
             break;
         case GPGPU_REG_DMA_SRC_HI:
-            gpu->dma.src_addr = val << 32;
+            gpu->dma.src_addr = (gpu->dma.src_addr & 0x00000000FFFFFFFFULL) | (val << 32);
             break;
         case GPGPU_REG_DMA_DST_LO:
-            gpu->dma.dst_addr = (val << 32) >> 32;
+            gpu->dma.dst_addr = (gpu->dma.dst_addr & 0xFFFFFFFF00000000ULL) | val;
             break;
         case GPGPU_REG_DMA_DST_HI:
-            gpu->dma.dst_addr = val << 32;
+            gpu->dma.dst_addr = (gpu->dma.dst_addr & 0x00000000FFFFFFFFULL) | (val << 32);
             break;
         case GPGPU_REG_DMA_SIZE:
             gpu->dma.size = val;
