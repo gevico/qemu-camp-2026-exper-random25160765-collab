@@ -93,16 +93,7 @@ EXEC_FUNC(csrrs,    {
 
 /* RV32F */
 EXEC_FUNC(fcvt_s_w, { 
-    float result = (float)src1_u32; 
-    
-    // 监控写入
-    if (lane_id == 1 && ctx->rd == 1) {
-        static int write_count = 0;
-        write_count++;
-        printf("[MONITOR] WRITE fpr[1] lane1: cycle? value=0x%08x (%f), count=%d\n",
-               *(uint32_t*)&result, result, write_count);
-    }
-    
+    float result = (float)l->gpr[ctx->rs1];  // 直接读取整数寄存器
     memcpy(&F(rd), &result, sizeof(float));
 })
 
@@ -136,11 +127,9 @@ EXEC_FUNC(fadd_s, {
 })
 
 EXEC_FUNC(fcvt_w_s, { 
-    printf("[DEBUG] fcvt_w_s: lane=%d, src1_f=%f, rd=%d\n", 
-           lane_id, src1_f, ctx->rd);
-    G(rd) = (int32_t)src1_f;
-    printf("[DEBUG] fcvt_w_s: result=%d\n", (int32_t)src1_f);
-    fflush(stdout);
+    float f_val;
+    memcpy(&f_val, &l->fpr[ctx->rs1], sizeof(float));
+    G(rd) = (int32_t)f_val;
 })
 
 
@@ -248,9 +237,11 @@ static int exec_one_inst(GPGPUState *s, GPGPUWarp *warp, uint32_t inst)
     }
 
     for (int lane = 0; lane < GPGPU_WARP_SIZE; lane++) {
-        entry->exec(&ctx, lane);
-        warp->lanes[lane].gpr[0] = 0;
-        warp->lanes[lane].fpr[0] = 0;
+        if (warp->active_mask & (1 << lane)) {
+            entry->exec(&ctx, lane);
+            warp->lanes[lane].gpr[0] = 0;
+            warp->lanes[lane].fpr[0] = 0;
+        }
     }
 
     return 0;
