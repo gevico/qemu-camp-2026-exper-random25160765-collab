@@ -81,16 +81,9 @@ EXEC_FUNC(lui,      { G(rd) = imm; })
 EXEC_FUNC(sw,       { Mw(src1 + imm, 4, src2); })
 EXEC_FUNC(ebreak,   { /* nothing */ })
 EXEC_FUNC(csrrs,    {
-    printf("[DEBUG] csrrs: lane_id=%d, imm=0x%x, l->mhartid=0x%x\n", 
-           lane_id, (uint16_t)imm, l->mhartid);
-    fflush(stdout);
-    
     switch ((uint16_t)imm) {
         case CSR_MHARTID: 
             G(rd) = l->mhartid;
-            printf("[DEBUG] csrrs: lane %d: mhartid=0x%x -> GPR[%u]=0x%x\n", 
-                   lane_id, l->mhartid, ctx->rd, l->mhartid);
-            fflush(stdout);
             break;
         default:
             printf("[DEBUG] csrrs: unknown CSR 0x%x\n", (uint16_t)imm);
@@ -101,38 +94,37 @@ EXEC_FUNC(csrrs,    {
 /* RV32F */
 EXEC_FUNC(fcvt_s_w, { 
     float result = (float)src1_u32; 
-    printf("[DEBUG] fcvt_s_w: BEFORE memcpy, lane=%d, rd=%d, &fpr[rd]=%p\n", 
-           lane_id, ctx->rd, &l->fpr[ctx->rd]);
+    
+    // 监控写入
+    if (lane_id == 1 && ctx->rd == 1) {
+        static int write_count = 0;
+        write_count++;
+        printf("[MONITOR] WRITE fpr[1] lane1: cycle? value=0x%08x (%f), count=%d\n",
+               *(uint32_t*)&result, result, write_count);
+    }
+    
     memcpy(&F(rd), &result, sizeof(float));
-    printf("[DEBUG] fcvt_s_w: AFTER memcpy, fpr[%d]=0x%08x\n", 
-           ctx->rd, l->fpr[ctx->rd]);
-    // 立即验证
-    float verify;
-    memcpy(&verify, &l->fpr[ctx->rd], sizeof(float));
-    printf("[DEBUG] fcvt_s_w: VERIFY float=%f\n", verify);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fmul_s, { 
-    printf("[DEBUG] fmul_s: lane=%d, l=%p, &fpr[1]=%p\n", 
-           lane_id, l, &l->fpr[1]);
-    printf("[DEBUG] fmul_s: fpr[1]=0x%08x, fpr[2]=0x%08x\n", 
-           l->fpr[1], l->fpr[2]);
-    printf("[DEBUG] fmul_s: lane=%d, ctx->type=%d, IS_FP_TYPE=%d\n", 
-           lane_id, ctx->type, IS_FP_TYPE(ctx->type));
-    printf("[DEBUG] fmul_s: src1_u32=0x%08x, src2_u32=0x%08x\n", 
-           src1_u32, src2_u32);
-    printf("[DEBUG] fmul_s: before memcpy - src1_f=%f, src2_f=%f\n", 
-           src1_f, src2_f);
+    // 监控读取
+    if (lane_id == 1) {
+        static int read_count = 0;
+        static uint32_t last_value = 0;
+        read_count++;
+        
+        printf("[MONITOR] READ fpr[1] lane1: value=0x%08x, count=%d\n", 
+               l->fpr[1], read_count);
+        
+        if (read_count > 1 && l->fpr[1] != last_value) {
+            printf("[MONITOR] *** fpr[1] changed from 0x%08x to 0x%08x ***\n", 
+                   last_value, l->fpr[1]);
+        }
+        last_value = l->fpr[1];
+    }
     
-    float result = src1_f * src2_f;
-    
-    printf("[DEBUG] fmul_s: after memcpy? src1_f=%f, src2_f=%f, result=%f, rd=%d\n", 
-           src1_f, src2_f, result, ctx->rd);
+    float result = src1_f * src2_f; 
     memcpy(&F(rd), &result, sizeof(float));
-    printf("[DEBUG] fmul_s: stored to fpr[%d]=0x%08x\n", 
-           ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fadd_s, { 
@@ -228,8 +220,6 @@ static opcode_entry_t *lookup_opcode(uint32_t inst)
 {
     for (size_t i = 0; i < opcode_table_count; i++) {
         if ((inst & opcode_table[i].mask) == opcode_table[i].match) {
-            printf("[DEBUG] lookup_opcode: inst=0x%08x matched entry %zu, mask=0x%08x, match=0x%08x, exec=%p\n",
-                   inst, i, opcode_table[i].mask, opcode_table[i].match, opcode_table[i].exec);
             return &opcode_table[i];
         }
     }
@@ -239,12 +229,8 @@ static opcode_entry_t *lookup_opcode(uint32_t inst)
 /* Only least instructions to pass the test are implemented */
 static int exec_one_inst(GPGPUState *s, GPGPUWarp *warp, uint32_t inst)
 {
-    printf("[DEBUG] exec_one_inst: inst=0x%08x\n", inst);
-    fflush(stdout);
-
     const opcode_entry_t *entry = lookup_opcode(inst);
     if (!entry) {
-        printf("[ERROR] exec_one_inst: Unsupported instruction 0x%08x\n", inst);
         qemu_log_mask(LOG_GUEST_ERROR, "Unsupported: 0x%08x\n", inst);
         return -1;
     }
@@ -254,68 +240,19 @@ static int exec_one_inst(GPGPUState *s, GPGPUWarp *warp, uint32_t inst)
         .warp = warp,
         .type = entry->type,
     };
-    
-    printf("[DEBUG] exec_one_inst: opcode matched, entry->match=0x%x, type=%d\n", 
-           entry->match, entry->type);
-    fflush(stdout);
 
     get_warp_ctx(&ctx, inst, entry->type);
-    printf("[DEBUG] exec_one_inst: get_warp_ctx completed\n");
-    fflush(stdout);
     
     if (entry->match == MATCH_EBREAK) {
-        printf("[DEBUG] exec_one_inst: EBREAK instruction, returning 1\n");
-        fflush(stdout);
         return 1;
     }
 
-    printf("[DEBUG] exec_one_inst: executing for %d active lanes (active_mask=0x%x)\n", 
-           __builtin_popcount(warp->active_mask), warp->active_mask);
-    fflush(stdout);
-
     for (int lane = 0; lane < GPGPU_WARP_SIZE; lane++) {
-        if (warp->active_mask & (1 << lane)) {
-            printf("[DEBUG]   lane %d: before exec, ", lane);
-            
-            // 打印关键寄存器的值（根据指令类型）
-            if (entry->type == TYPE_R || entry->type == TYPE_I) {
-                printf("rs1=%u, rs2=%u, rd=%u", 
-                       ctx.rs1, ctx.rs2, ctx.rd);
-                if (entry->type == TYPE_I) {
-                    printf(", imm=0x%x", ctx.imm);
-                }
-            } else if (entry->type == TYPE_S) {
-                printf("rs1=%u, rs2=%u, imm=0x%x", 
-                       ctx.rs1, ctx.rs2, ctx.imm);
-            } else if (entry->type == TYPE_U) {
-                printf("rd=%u, imm=0x%x", ctx.rd, ctx.imm);
-            }
-            
-            printf("\n");
-            fflush(stdout);
-            
-            entry->exec(&ctx, lane);
-            
-            printf("[DEBUG]   lane %d: after exec, ", lane);
-            if (entry->type == TYPE_R || entry->type == TYPE_I || entry->type == TYPE_U) {
-                if (ctx.rd != 0) {
-                    printf("rd=%u, value=0x%x", ctx.rd, warp->lanes[lane].gpr[ctx.rd]);
-                } else {
-                    printf("rd=0 (x0)");
-                }
-            } else if (entry->type == TYPE_S) {
-                printf("store completed");
-            }
-            printf("\n");
-            fflush(stdout);
-            
-            warp->lanes[lane].gpr[0] = 0;
-            warp->lanes[lane].fpr[0] = 0;
-        }
+        entry->exec(&ctx, lane);
+        warp->lanes[lane].gpr[0] = 0;
+        warp->lanes[lane].fpr[0] = 0;
     }
-    
-    printf("[DEBUG] exec_one_inst: completed, returning 0\n");
-    fflush(stdout);
+
     return 0;
 }
 
@@ -324,13 +261,7 @@ void gpgpu_core_init_warp(GPGPUWarp *warp, uint32_t pc,
                           uint32_t thread_id_base, const uint32_t block_id[3],
                           uint32_t num_threads,
                           uint32_t warp_id, uint32_t block_id_linear)
-{
-    printf("[DEBUG] gpgpu_core_init_warp: start\n");
-    printf("[DEBUG]   pc=0x%x, thread_id_base=%u, num_threads=%u, warp_id=%u, block_id_linear=%u\n",
-           pc, thread_id_base, num_threads, warp_id, block_id_linear);
-    printf("[DEBUG]   block_id=(%u,%u,%u)\n", block_id[0], block_id[1], block_id[2]);
-    fflush(stdout);
-    
+{   
     memset(warp, 0, sizeof(*warp));
     
     warp->thread_id_base = thread_id_base;
@@ -345,13 +276,6 @@ void gpgpu_core_init_warp(GPGPUWarp *warp, uint32_t pc,
     } else {
         warp->active_mask = (1 << num_threads) - 1;
     }
-    printf("[DEBUG]   active_mask = 0x%x (binary: ", warp->active_mask);
-    for (int i = 31; i >= 0; i--) {
-        if (i == 7) printf(" ");
-        printf("%d", (warp->active_mask >> i) & 1);
-    }
-    printf(")\n");
-    fflush(stdout);
     
     /* Initialize each lane */
     for (int i = 0; i < GPGPU_WARP_SIZE; i++) {
@@ -363,17 +287,7 @@ void gpgpu_core_init_warp(GPGPUWarp *warp, uint32_t pc,
         lane->gpr[0] = 0;
         /* f0 is always 0 */
         lane->fpr[0] = 0;
-        
-        if (i < 8 || (i >= 24 && i < 32)) {  // 打印前8个和后8个
-            printf("[DEBUG]   lane[%2d]: active=%d, mhartid=0x%x (block=%u, warp=%u, lane=%u)\n",
-                   i, lane->active, lane->mhartid,
-                   block_id_linear, warp_id, i);
-        }
     }
-    fflush(stdout);
-    
-    printf("[DEBUG] gpgpu_core_init_warp: done\n");
-    fflush(stdout);
 }
 
 /* warp execution */
@@ -381,71 +295,36 @@ int gpgpu_core_exec_warp(GPGPUState *s, GPGPUWarp *warp, uint32_t max_cycles)
 {
     uint32_t cycles = 0;
     
-    printf("[DEBUG] gpgpu_core_exec_warp: entry\n");
-    printf("[DEBUG]   warp->active_mask = 0x%x\n", warp->active_mask);
-    printf("[DEBUG]   warp->pc = 0x%x\n", warp->lanes[0].pc);
-    printf("[DEBUG]   s->vram_ptr = %p\n", s->vram_ptr);
-    printf("[DEBUG]   s->vram_size = 0x%lx\n", s->vram_size);
-    fflush(stdout);
-    
     while (cycles < max_cycles) {
-        printf("[DEBUG] exec_warp: cycle=%u, pc=0x%x\n", cycles, warp->lanes[0].pc);
-        fflush(stdout);
-        
+
         uint32_t pc = warp->lanes[0].pc;
         if (pc >= s->vram_size) {
-            printf("[ERROR] PC 0x%x >= VRAM size 0x%lx\n", pc, s->vram_size);
-            fflush(stdout);
             return -1;
         }
-        
-        printf("[DEBUG] Reading instruction from vram_ptr+0x%x = %p\n", pc, s->vram_ptr + pc);
-        fflush(stdout);
         
         uint32_t inst = *(uint32_t *)(s->vram_ptr + pc);
-        printf("[DEBUG] inst = 0x%08x\n", inst);
-        fflush(stdout);
-        
-        printf("[DEBUG] Calling exec_one_inst...\n");
-        fflush(stdout);
         int ret = exec_one_inst(s, warp, inst);
-        printf("[DEBUG] exec_one_inst returned %d\n", ret);
-        fflush(stdout);
         
         if (ret == 1) {
-            printf("[DEBUG] exec_one_inst returned 1 (kernel finished)\n");
             return 0;
         } else if (ret == -1) {
-            printf("[ERROR] exec_one_inst returned -1\n");
             return -1;
         }
         
-        printf("[DEBUG] Updating PCs for active lanes (active_mask=0x%x)\n", warp->active_mask);
-        fflush(stdout);
         for (int i = 0; i < GPGPU_WARP_SIZE; i++) {
             if (warp->active_mask & (1 << i)) {
                 warp->lanes[i].pc += 4;
-                if (i < 5) {  // 只打印前5个lane
-                    printf("[DEBUG]   lane[%d] pc -> 0x%x\n", i, warp->lanes[i].pc);
-                }
             }
         }
-        fflush(stdout);
         
         cycles++;
-        printf("[DEBUG] cycles=%u, max_cycles=%u\n", cycles, max_cycles);
-        fflush(stdout);
     }
     
-    printf("[ERROR] Exceeded max cycles (%u)\n", max_cycles);
     return -1;
 }
 
 int gpgpu_core_exec_kernel(GPGPUState *s)
 {
-    printf("[DEBUG] gpgpu_core_exec_kernel: start\n");
-    fflush(stdout);
-    
     uint32_t grid_dim[3] = {
         s->kernel.grid_dim[0],
         s->kernel.grid_dim[1],
@@ -457,63 +336,33 @@ int gpgpu_core_exec_kernel(GPGPUState *s)
         s->kernel.block_dim[2]
     };
     
-    printf("[DEBUG] grid_dim: (%u, %u, %u)\n", grid_dim[0], grid_dim[1], grid_dim[2]);
-    printf("[DEBUG] block_dim: (%u, %u, %u)\n", block_dim[0], block_dim[1], block_dim[2]);
-    printf("[DEBUG] kernel_addr: 0x%lx\n", s->kernel.kernel_addr);
-    fflush(stdout);
-    
     uint32_t kernel_addr = s->kernel.kernel_addr;
     uint32_t threads_per_block = block_dim[0] * block_dim[1] * block_dim[2];
-    printf("[DEBUG] threads_per_block: %u\n", threads_per_block);
-    fflush(stdout);
     
     for (uint32_t z = 0; z < grid_dim[2]; z++) {
         for (uint32_t y = 0; y < grid_dim[1]; y++) {
             for (uint32_t x = 0; x < grid_dim[0]; x++) {
-                printf("[DEBUG] Processing block (%u, %u, %u)\n", x, y, z);
-                fflush(stdout);
-                
                 uint32_t block_id[3] = {x, y, z};
                 uint32_t block_id_linear = z * grid_dim[0] * grid_dim[1] + y * grid_dim[0] + x;
                 
                 uint32_t num_warps = (threads_per_block + GPGPU_WARP_SIZE - 1) / GPGPU_WARP_SIZE;
-                printf("[DEBUG] num_warps: %u\n", num_warps);
-                fflush(stdout);
-                
                 for (uint32_t warp_id = 0; warp_id < num_warps; warp_id++) {
-                    printf("[DEBUG] Processing warp_id: %u\n", warp_id);
-                    fflush(stdout);
-                    
                     GPGPUWarp warp;
                     uint32_t thread_id_base = warp_id * GPGPU_WARP_SIZE;
                     uint32_t num_threads = threads_per_block - thread_id_base;
                     if (num_threads > GPGPU_WARP_SIZE) {
                         num_threads = GPGPU_WARP_SIZE;
                     }
-                    
-                    printf("[DEBUG] Calling gpgpu_core_init_warp...\n");
-                    fflush(stdout);
                     gpgpu_core_init_warp(&warp, kernel_addr, thread_id_base, 
                                         block_id, num_threads, 
                                         warp_id, block_id_linear);
-                    printf("[DEBUG] gpgpu_core_init_warp done\n");
-                    fflush(stdout);
-                    
-                    printf("[DEBUG] Calling gpgpu_core_exec_warp...\n");
-                    fflush(stdout);
                     int ret = gpgpu_core_exec_warp(s, &warp, 1000);
-                    printf("[DEBUG] gpgpu_core_exec_warp returned: %d\n", ret);
-                    fflush(stdout);
-                    
                     if (ret != 0) {
-                        printf("[ERROR] gpgpu_core_exec_warp failed with %d\n", ret);
                         return -1;
                     }
                 }
             }
         }
     }
-    
-    printf("[DEBUG] gpgpu_core_exec_kernel: success\n");
     return 0;
 }

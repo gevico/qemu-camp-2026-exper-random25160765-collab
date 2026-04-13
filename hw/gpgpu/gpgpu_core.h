@@ -96,25 +96,24 @@ static inline uint32_t get_read_addr(void *addr, int len) {
 }
 
 /* Function table macros */
-#define IS_FP_TYPE(t) ((t) == TYPE_FR || (t) == TYPE_FI || (t) == TYPE_FS || (t) == TYPE_F4)
+// 源操作数来自浮点寄存器的类型
+#define IS_FP_SRC_TYPE(t) ((t) == TYPE_FR || (t) == TYPE_FI || (t) == TYPE_FS || (t) == TYPE_F4)
+// 目的操作数是浮点寄存器的类型（用于 fcvt_s_w）
+#define IS_FP_DST_TYPE(t) ((t) == TYPE_FR || (t) == TYPE_FI || (t) == TYPE_FS || (t) == TYPE_F4)
 
 #define INIT_LANE_CONTEXT() \
     GPGPULane *l = &ctx->warp->lanes[lane_id]; \
-    uint32_t src1_u32 = IS_FP_TYPE(ctx->type) ? l->fpr[ctx->rs1] : l->gpr[ctx->rs1]; \
-    uint32_t src2_u32 = IS_FP_TYPE(ctx->type) ? l->fpr[ctx->rs2] : l->gpr[ctx->rs2]; \
+    uint32_t src1_u32 = IS_FP_SRC_TYPE(ctx->type) ? l->fpr[ctx->rs1] : l->gpr[ctx->rs1]; \
+    uint32_t src2_u32 = IS_FP_SRC_TYPE(ctx->type) ? l->fpr[ctx->rs2] : l->gpr[ctx->rs2]; \
     uint32_t src3_u32 = l->fpr[ctx->rs3]; \
     int32_t imm = ctx->imm; \
     float src1_f, src2_f, src3_f; \
-    if (IS_FP_TYPE(ctx->type)) { \
+    if (IS_FP_DST_TYPE(ctx->type)) { \
         memcpy(&src1_f, &src1_u32, sizeof(float)); \
         memcpy(&src2_f, &src2_u32, sizeof(float)); \
         memcpy(&src3_f, &src3_u32, sizeof(float)); \
-        printf("[DEBUG] INIT: lane=%d, src1_u32=0x%08x -> src1_f=%f\n", \
-               lane_id, src1_u32, src1_f); \
     } else { \
         src1_f = 0; src2_f = 0; src3_f = 0; \
-        printf("[DEBUG] INIT: lane=%d, NOT FP type (type=%d), setting src1_f=0\n", \
-               lane_id, ctx->type); \
     } \
     uint32_t src1 = src1_u32; \
     uint32_t src2 = src2_u32; \
@@ -126,7 +125,6 @@ static inline uint32_t get_read_addr(void *addr, int len) {
         INIT_LANE_CONTEXT(); \
         code \
     }
-
 
 static inline void get_write_addr(void *addr, int len, uint32_t data) {
     switch (len) {
