@@ -114,7 +114,6 @@ EXEC_FUNC(fcvt_w_s, {
     G(rd) = (int32_t)f_val;
 })
 
-/* 低精度转换指令 - 硬编码，不依赖 INIT 宏，带调试信息 */
 EXEC_FUNC(fcvt_s_bf16, {  // BF16 → FP32
     uint32_t bits = l->fpr[ctx->rs1];
     uint16_t bf = (uint16_t)(bits >> 16);
