@@ -214,9 +214,9 @@ typedef struct opcode_entry {
     X(fcvt_e5m2_s,  "0100100 00011 ????? ??? ????? 10100 11", TYPE_FR); \
     X(fcvt_s_e2m1,  "0100110 00000 ????? ??? ????? 10100 11", TYPE_FR); \
     X(fcvt_e2m1_s,  "0100110 00001 ????? ??? ????? 10100 11", TYPE_FR); \
-    X(fmv_w_x,      "1111000 00000 ????? 000 ????? 1010011", TYPE_FI);
+    X(fmv_w_x,      "1111000 00000 ????? 000 ????? 10100 11", TYPE_FI);
 
-static opcode_entry_t opcode_table[16];
+static opcode_entry_t opcode_table[NUM_OF_INST];
 static size_t opcode_table_count = 0;
 
 static void __attribute__((constructor)) init_opcode_table(void)
@@ -261,38 +261,13 @@ static void __attribute__((constructor)) init_opcode_table(void)
 }
 
 static opcode_entry_t *lookup_opcode(uint32_t inst)
-{
-    // 调试：打印所有条目
-    static int once = 0;
-    if (!once) {
-        once = 1;
-        for (size_t i = 0; i < opcode_table_count; i++) {
-            printf("[OPCODE] entry %zu: mask=0x%08x match=0x%08x\n", 
-                   i, opcode_table[i].mask, opcode_table[i].match);
-        }
-    }
-    
+{    
     for (size_t i = 0; i < opcode_table_count; i++) {
         if ((inst & opcode_table[i].mask) == opcode_table[i].match) {
-            printf("[OPCODE] inst=0x%08x matched entry %zu\n", inst, i);
             return &opcode_table[i];
         }
     }
-    
-    printf("[OPCODE] inst=0x%08x not matched!\n", inst);
-    
-    // 手动匹配有问题的指令
-    static opcode_entry_t manual_entry;
-    switch (inst) {
-        case 0x482101d3: // fcvt.s.e5m2
-            manual_entry.exec = exec_fcvt_s_e5m2;
-            manual_entry.type = TYPE_FR;
-            printf("[OPCODE] manual match for 0x%08x\n", inst);
-            return &manual_entry;
-        // 添加其他未匹配的指令
-        default:
-            return NULL;
-    }
+    return NULL;
 }
 
 /* Only least instructions to pass the test are implemented */
@@ -376,15 +351,11 @@ int gpgpu_core_exec_warp(GPGPUState *s, GPGPUWarp *warp, uint32_t max_cycles)
         uint32_t inst = *(uint32_t *)(s->vram_ptr + pc);
         int ret = exec_one_inst(s, warp, inst);
         
-        printf("[WARP] pc=0x%x, inst=0x%08x, ret=%d\n", pc, inst, ret);
         if (ret == 1) {
             return 0;
         } else if (ret == -1) {
-            printf("[WARP] exec_one_inst returned -1, aborting\n");
             return -1;
         }
-        // 更新 pc 后打印
-        printf("[WARP] new pc=0x%x\n", warp->lanes[0].pc);
         
         if (ret == 1) {
             return 0;
