@@ -19,28 +19,28 @@ uint16_t f32_to_bf16(float f) {
         if (mant == 0) {
             return sign ? 0x8000 : 0x0000;
         }
-        // Subnormal: 转换为正常数
+        // Subnormal: convert to normal number
         int clz = __builtin_clz(mant) - 8;
         mant <<= clz;
         exp = 1 - clz;
     }
     
-    // BF16: 指数偏置从127转换到127 (相同), 尾数从23位截断到7位
-    // 舍入到最近偶数 (RNE)
+    // BF16: exponent bias remains 127 (same), mantissa truncated from 23 to 7 bits
+    // Round to nearest even (RNE)
     uint32_t bf16_mant = mant >> 16;
     uint32_t rounding_bit = (mant >> 15) & 1;
     uint32_t sticky_bit = (mant & 0x7FFF) ? 1 : 0;
     
-    // 舍入逻辑
+    // Rounding logic
     if (rounding_bit && (sticky_bit || (bf16_mant & 1))) {
         bf16_mant++;
-        if (bf16_mant > 0x7F) {  // 尾数溢出
+        if (bf16_mant > 0x7F) {  // Mantissa overflow
             bf16_mant = 0;
             exp++;
         }
     }
     
-    // 检查指数溢出
+    // Check for exponent overflow
     if (exp >= 0xFF) {
         return sign ? 0xFF80 : 0x7F80;  // Inf
     }
@@ -63,38 +63,38 @@ uint8_t f32_to_e4m3(float f) {
     uint32_t exp = (bits >> 23) & 0xFF;
     uint32_t mant = bits & 0x7FFFFF;
     
-    // 处理 NaN/Inf
+    // Handle NaN/Inf
     if (exp == 0xFF) {
-        return sign ? 0xFF : 0x7F;  // 饱和到最大绝对值
+        return sign ? 0xFF : 0x7F;  // Saturate to maximum absolute value
     }
     
-    // 处理 0
+    // Handle 0
     if (exp == 0 && mant == 0) {
         return sign ? 0x80 : 0x00;
     }
     
-    // 计算实际值
+    // Calculate actual value
     float abs_f = fabsf(f);
     
-    // E4M3 可表示的最大值
+    // E4M3 maximum representable value
     const float max_val = 448.0f;
     if (abs_f >= max_val) {
         return sign ? 0xFF : 0x7F;
     }
     
-    // 处理 subnormal (非常小的数)
+    // Handle subnormal (very small numbers)
     const float min_normal = 0.001953125f;  // 2^-9
     
     if (abs_f < min_normal) {
-        // 量化到 subnormal 区域
+        // Quantize to subnormal range
         if (abs_f < min_normal / 16.0f) {
-            return sign ? 0x80 : 0x00;  // 接近 0
+            return sign ? 0x80 : 0x00;  // Close to 0
         }
-        // 查找最接近的 subnormal 值
+        // Find closest subnormal value
         uint8_t best_idx = 0;
         float best_diff = abs_f;
         for (int i = 1; i < 8; i++) {
-            float val = (i / 512.0f);  // subnormal 值
+            float val = (i / 512.0f);  // subnormal value
             float diff = fabsf(val - abs_f);
             if (diff < best_diff) {
                 best_diff = diff;
@@ -104,9 +104,9 @@ uint8_t f32_to_e4m3(float f) {
         return sign ? (0x80 | best_idx) : best_idx;
     }
     
-    // 正常数: 找到最接近的表示
-    // E4M3: 符号1, 指数4(bias=7), 尾数3
-    // 可表示的指数范围: -7 到 7 (加上特殊值到 8)
+    // Normal numbers: find closest representation
+    // E4M3: sign 1, exponent 4(bias=7), mantissa 3
+    // Representable exponent range: -7 to 7 (plus special values up to 8)
     uint8_t best_encoding = 0;
     float best_diff = INFINITY;
     
@@ -155,7 +155,7 @@ float e4m3_to_f32(uint8_t e4m3) {
             result = (mant / 8.0f) * powf(2.0f, -6);
         }
     } else if (exp == 0xF) {
-        // 特殊值 (NaN/Inf 或 最大值)
+        // Special values (NaN/Inf or maximum value)
         if (mant == 0x7) {
             result = 448.0f;
         } else {
@@ -169,7 +169,7 @@ float e4m3_to_f32(uint8_t e4m3) {
     return sign ? -result : result;
 }
 
-/* E5M2 转换函数 (1-5-2 格式, bias=15) */
+/* E5M2 conversion functions (1-5-2 format, bias=15) */
 uint8_t f32_to_e5m2(float f) {
     uint32_t bits;
     memcpy(&bits, &f, sizeof(float));
@@ -178,7 +178,7 @@ uint8_t f32_to_e5m2(float f) {
     uint32_t exp = (bits >> 23) & 0xFF;
     uint32_t mant = bits & 0x7FFFFF;
     
-    // 处理 NaN/Inf
+    // Handle NaN/Inf
     if (exp == 0xFF) {
         if (mant == 0) {
             return sign ? 0xFC : 0x7C;  // Inf
@@ -186,21 +186,21 @@ uint8_t f32_to_e5m2(float f) {
         return 0x7E;  // NaN
     }
     
-    // 处理 0
+    // Handle 0
     if (exp == 0 && mant == 0) {
         return sign ? 0x80 : 0x00;
     }
     
     float abs_f = fabsf(f);
     
-    // E5M2 最大值
+    // E5M2 maximum value
     const float max_val = 57344.0f;
     if (abs_f >= max_val) {
         return sign ? 0xFC : 0x7C;
     }
     
-    // 找到最接近的 E5M2 表示
-    // E5M2: 符号1, 指数5(bias=15), 尾数2
+    // Find closest E5M2 representation
+    // E5M2: sign 1, exponent 5(bias=15), mantissa 2
     uint8_t best_encoding = 0;
     float best_diff = INFINITY;
     
@@ -244,7 +244,7 @@ float e5m2_to_f32(uint8_t e5m2) {
         // Subnormal
         result = (mant / 4.0f) * powf(2.0f, -14);
     } else if (exp == 0x1F) {
-        // 特殊值
+        // Special values
         if (mant == 0) {
             result = INFINITY;
         } else {
@@ -258,7 +258,7 @@ float e5m2_to_f32(uint8_t e5m2) {
     return sign ? -result : result;
 }
 
-/* E2M1 转换函数 (1-2-1 格式, bias=1) */
+/* E2M1 conversion functions (1-2-1 format, bias=1) */
 uint8_t f32_to_e2m1(float f) {
     uint32_t bits;
     memcpy(&bits, &f, sizeof(float));
@@ -267,21 +267,21 @@ uint8_t f32_to_e2m1(float f) {
     uint32_t exp = (bits >> 23) & 0xFF;
     // uint32_t mant = bits & 0x7FFFFF;
     
-    // 处理 NaN/Inf
+    // Handle NaN/Inf
     if (exp == 0xFF) {
-        return sign ? 0x8F : 0x07;  // 饱和到最大值
+        return sign ? 0x8F : 0x07;  // Saturate to maximum value
     }
     
     float abs_f = fabsf(f);
     
-    // E2M1 最大值
+    // E2M1 maximum value
     const float max_val = 6.0f;
     if (abs_f >= max_val) {
         return sign ? 0x8F : 0x07;
     }
     
-    // E2M1: 符号1, 指数2(bias=1), 尾数1
-    // 可表示值: 0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0
+    // E2M1: sign 1, exponent 2(bias=1), mantissa 1
+    // Representable values: 0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0
     uint8_t best_encoding = 0;
     float best_diff = INFINITY;
     
@@ -294,11 +294,11 @@ uint8_t f32_to_e2m1(float f) {
         for (int m = 0; m < 2; m++) {
             float val;
             if (e == 0) {
-                // Subnormal (只有 0)
+                // Subnormal (only 0)
                 if (m == 0) {
                     val = 0.0f;
                 } else {
-                    continue;  // E2M1 subnormal 只有 0
+                    continue;  // E2M1 subnormal only has 0
                 }
             } else {
                 // Normal
@@ -315,9 +315,9 @@ uint8_t f32_to_e2m1(float f) {
         }
     }
     
-    // 特殊处理 6.0 (exp=2, mant=1 实际是 6.0)
+    // Special handling for 6.0 (exp=2, mant=1 actually is 6.0)
     if (fabsf(6.0f - abs_f) < best_diff) {
-        best_encoding = 0x7;  // 111: exp=3, mant=1 (实际是6.0)
+        best_encoding = 0x7;  // 111: exp=3, mant=1 (actually 6.0)
     }
     
     return sign ? (0x80 | best_encoding) : best_encoding;
@@ -331,12 +331,12 @@ float e2m1_to_f32(uint8_t e2m1) {
     float result;
     
     if (exp == 0) {
-        // Subnormal: 只有 0
+        // Subnormal: only 0
         result = 0.0f;
     } else {
         // Normal
         if (exp == 3 && mant == 1) {
-            result = 6.0f;  // 特殊值
+            result = 6.0f;  // Special value
         } else {
             result = (1.0f + mant / 2.0f) * powf(2.0f, (int)exp - 1);
         }
