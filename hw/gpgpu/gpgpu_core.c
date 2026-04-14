@@ -95,11 +95,7 @@ EXEC_FUNC(csrrs,    {
 EXEC_FUNC(fcvt_s_w, { 
     int32_t src_int = l->gpr[ctx->rs1];
     float result = (float)src_int;
-    printf("[DEBUG] fcvt_s_w: lane=%d, rs1=%d, src_int=%d, result=%f, rd=%d\n",
-           lane_id, ctx->rs1, src_int, result, ctx->rd);
     memcpy(&F(rd), &result, sizeof(float));
-    printf("[DEBUG] fcvt_s_w: fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fmul_s, { 
@@ -123,11 +119,7 @@ EXEC_FUNC(fcvt_s_bf16, {  // BF16 → FP32
     uint32_t bits = l->fpr[ctx->rs1];
     uint16_t bf = (uint16_t)(bits >> 16);
     float result = bf16_to_f32(bf);
-    printf("[DEBUG] fcvt_s_bf16: lane=%d, rs1=%d, bits=0x%08x, bf=0x%04x, result=%f, rd=%d\n",
-           lane_id, ctx->rs1, bits, bf, result, ctx->rd);
     memcpy(&l->fpr[ctx->rd], &result, sizeof(float));
-    printf("[DEBUG] fcvt_s_bf16: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fcvt_bf16_s, {  // FP32 → BF16
@@ -135,22 +127,14 @@ EXEC_FUNC(fcvt_bf16_s, {  // FP32 → BF16
     memcpy(&src_f, &l->fpr[ctx->rs1], sizeof(float));
     uint16_t bf = f32_to_bf16(src_f);
     uint32_t val = (uint32_t)bf << 16;
-    printf("[DEBUG] fcvt_bf16_s: lane=%d, rs1=%d, src_f=%f, bf=0x%04x, val=0x%08x, rd=%d\n",
-           lane_id, ctx->rs1, src_f, bf, val, ctx->rd);
     l->fpr[ctx->rd] = val;
-    printf("[DEBUG] fcvt_bf16_s: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fcvt_s_e4m3, {  // E4M3 → FP32
     uint32_t bits = l->fpr[ctx->rs1];
     uint8_t e4m3 = (uint8_t)(bits >> 24);
     float result = e4m3_to_f32(e4m3);
-    printf("[DEBUG] fcvt_s_e4m3: lane=%d, rs1=%d, bits=0x%08x, e4m3=0x%02x, result=%f, rd=%d\n",
-           lane_id, ctx->rs1, bits, e4m3, result, ctx->rd);
     memcpy(&l->fpr[ctx->rd], &result, sizeof(float));
-    printf("[DEBUG] fcvt_s_e4m3: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fcvt_e4m3_s, {  // FP32 → E4M3
@@ -158,24 +142,15 @@ EXEC_FUNC(fcvt_e4m3_s, {  // FP32 → E4M3
     memcpy(&src_f, &l->fpr[ctx->rs1], sizeof(float));
     uint8_t e4m3 = f32_to_e4m3(src_f);
     uint32_t val = (uint32_t)e4m3 << 24;
-    printf("[DEBUG] fcvt_e4m3_s: lane=%d, rs1=%d, src_f=%f, e4m3=0x%02x, val=0x%08x, rd=%d\n",
-           lane_id, ctx->rs1, src_f, e4m3, val, ctx->rd);
     l->fpr[ctx->rd] = val;
-    printf("[DEBUG] fcvt_e4m3_s: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fcvt_s_e5m2, {  // E5M2 → FP32
-    printf("fcvt_s_e5m2 called\n");
     fflush(stdout);
     uint32_t bits = l->fpr[ctx->rs1];
     uint8_t e5m2 = (uint8_t)(bits >> 24);
     float result = e5m2_to_f32(e5m2);
-    printf("[DEBUG] fcvt_s_e5m2: lane=%d, rs1=%d, bits=0x%08x, e5m2=0x%02x, result=%f, rd=%d\n",
-           lane_id, ctx->rs1, bits, e5m2, result, ctx->rd);
     memcpy(&l->fpr[ctx->rd], &result, sizeof(float));
-    printf("[DEBUG] fcvt_s_e5m2: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fcvt_e5m2_s, {  // FP32 → E5M2
@@ -183,22 +158,14 @@ EXEC_FUNC(fcvt_e5m2_s, {  // FP32 → E5M2
     memcpy(&src_f, &l->fpr[ctx->rs1], sizeof(float));
     uint8_t e5m2 = f32_to_e5m2(src_f);
     uint32_t val = (uint32_t)e5m2 << 24;
-    printf("[DEBUG] fcvt_e5m2_s: lane=%d, rs1=%d, src_f=%f, e5m2=0x%02x, val=0x%08x, rd=%d\n",
-           lane_id, ctx->rs1, src_f, e5m2, val, ctx->rd);
     l->fpr[ctx->rd] = val;
-    printf("[DEBUG] fcvt_e5m2_s: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fcvt_s_e2m1, {  // E2M1 → FP32
     uint32_t bits = l->fpr[ctx->rs1];
     uint8_t e2m1 = (uint8_t)(bits >> 28);  // 高4位
     float result = e2m1_to_f32(e2m1);
-    printf("[DEBUG] fcvt_s_e2m1: lane=%d, rs1=%d, bits=0x%08x, e2m1=0x%01x, result=%f, rd=%d\n",
-           lane_id, ctx->rs1, bits, e2m1, result, ctx->rd);
     memcpy(&l->fpr[ctx->rd], &result, sizeof(float));
-    printf("[DEBUG] fcvt_s_e2m1: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fcvt_e2m1_s, {  // FP32 → E2M1
@@ -206,11 +173,7 @@ EXEC_FUNC(fcvt_e2m1_s, {  // FP32 → E2M1
     memcpy(&src_f, &l->fpr[ctx->rs1], sizeof(float));
     uint8_t e2m1 = f32_to_e2m1(src_f);
     uint32_t val = (uint32_t)e2m1 << 28;
-    printf("[DEBUG] fcvt_e2m1_s: lane=%d, rs1=%d, src_f=%f, e2m1=0x%01x, val=0x%08x, rd=%d\n",
-           lane_id, ctx->rs1, src_f, e2m1, val, ctx->rd);
     l->fpr[ctx->rd] = val;
-    printf("[DEBUG] fcvt_e2m1_s: stored fpr[%d]=0x%08x\n", ctx->rd, l->fpr[ctx->rd]);
-    fflush(stdout);
 })
 
 EXEC_FUNC(fmv_w_x, {
